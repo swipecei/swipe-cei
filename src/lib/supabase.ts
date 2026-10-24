@@ -66,6 +66,7 @@ export interface ContactSubmission {
   status: 'new' | 'read' | 'resolved' | 'archived';
   user_agent?: string;
   ip_address?: string;
+  recaptcha_score?: number;
   created_at: string;
   updated_at: string;
 }
@@ -819,6 +820,7 @@ export const contactApi = {
     email: string;
     message: string;
     type: 'general' | 'volunteer' | 'programs' | 'partnership';
+    recaptchaToken: string;
   }): Promise<{ success: boolean; message: string; submissionId?: string; error?: string }> {
     try {
       const response = await fetch(
