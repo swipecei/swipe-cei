@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { Mail, Phone, MapPin, Send, Heart, Users, Calendar, MessageCircle, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { contactApi } from '../lib/supabase';
+import { getRecaptchaToken } from '../lib/recaptcha';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -31,7 +32,8 @@ const Contact = () => {
     setSubmitStatus({ type: null, message: '' });
 
     try {
-      const result = await contactApi.submitContactForm(formData);
+      const recaptchaToken = await getRecaptchaToken('contact_form');
+      const result = await contactApi.submitContactForm({ ...formData, recaptchaToken });
 
       if (result.success) {
         setSubmitStatus({ type: 'success', message: result.message });
