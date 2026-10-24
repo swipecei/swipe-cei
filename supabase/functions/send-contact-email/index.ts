@@ -12,6 +12,26 @@ interface ContactFormData {
   email: string;
   message: string;
   type: "general" | "volunteer" | "programs" | "partnership";
+  recaptchaToken: string;
+}
+
+const RECAPTCHA_MIN_SCORE = 0.5;
+
+async function verifyRecaptcha(token: string): Promise<{ success: boolean; score: number }> {
+  const secret = Deno.env.get("RECAPTCHA_SECRET_KEY");
+  if (!secret) {
+    console.error("RECAPTCHA_SECRET_KEY is not configured");
+    return { success: false, score: 0 };
+  }
+
+  const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `secret=${secret}&response=${token}`,
+  });
+
+  const data = await response.json();
+  return { success: data.success, score: data.score ?? 0 };
 }
 
 Deno.serve(async (req: Request) => {
@@ -24,7 +44,29 @@ Deno.serve(async (req: Request) => {
 
   try {
     const formData: ContactFormData = await req.json();
-    const { name, email, message, type } = formData;
+    const { name, email, message, type, recaptchaToken } = formData;
+
+    // Verify reCAPTCHA token
+    if (!recaptchaToken) {
+      return new Response(
+        JSON.stringify({ error: "reCAPTCHA verification is required. Please reload the page and try again." }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
+    if (!recaptchaResult.success || recaptchaResult.score < RECAPTCHA_MIN_SCORE) {
+      return new Response(
+        JSON.stringify({ error: "reCAPTCHA verification failed. Please try again." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Validate required fields
     if (!name || !email || !message || !type) {
@@ -88,6 +130,7 @@ Deno.serve(async (req: Request) => {
         type,
         user_agent: userAgent,
         ip_address: ipAddress,
+        recaptcha_score: recaptchaResult.score,
       }])
       .select()
       .single();
